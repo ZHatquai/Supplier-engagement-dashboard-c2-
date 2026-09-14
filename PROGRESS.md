@@ -3,12 +3,14 @@
 > Claude Code: read this file at the start of every session, before touching anything. Update it at every save point. Replace content, do not append. History lives in git.
 
 **Session:** 1 — first build session
-**Last updated:** 14 September 2026
+**Last updated:** 14 September 2026 — after the merge to main
 **Live URL:** none yet [Rule: fill in after the first successful deploy]
 
 ## Current state
 
-The dashboard is built and the database work is done. Nothing is deployed yet.
+The dashboard is built, the database work is done, and the code is on `main` (pull request 1,
+merged 14 September 2026). Netlify auto-deploys from `main`, so a production build is expected; the
+deploy result and the live URL still need confirming in the Netlify dashboard.
 
 **Database — "The corporate live build (New)", complete and verified.** The three nullable resolution
 columns (`resolved_by`, `resolved_at`, `resolution_note`) are on `submissions`, with no default, no
@@ -34,6 +36,9 @@ the blocked-confirm prompt. `npm run build` succeeds.
 email confirmed. They were created with temporary passwords that the builder must rotate — see Known
 issues.
 
+**Deploy previews ran on the pull request**, which confirms the Netlify site is connected to this
+repo. Whether they went green was not seen before the merge.
+
 **Verification done this session.** Every status transition, the blocked confirm, the accept path,
 and the paired resolution were exercised against the live database through the two functions and
 behaved exactly as specified. 43 logic assertions on the flag rules, the flag scope, the EcoVadis
@@ -48,12 +53,13 @@ review functions via MCP and verified the privilege model in-database. Read the 
 from a live row. Built the React frontend end to end and rewrote `docs/supabase-setup.md` as the
 shared source of truth for both tools. Created the three auth accounts. Could not test the browser
 against the live project: this container's network policy blocks the Supabase host, so the UI was
-verified against fixture data instead.
+verified against fixture data instead. The work was merged to `main` through pull request 1 at the
+end of the session.
 
 ## Remaining work
 
-- [ ] **Builder: merge `claude/dazzling-ptolemy-lsix9p` into `main`.** The session was pinned to a
-      feature branch, so Netlify has not seen this code. Nothing deploys until main moves.
+- [ ] **Builder: confirm the Netlify production deploy from `main` succeeded** and record the live
+      URL in the header of this file
 - [ ] **Builder: rotate the three temporary account passwords** in Supabase → Authentication → Users.
 - [ ] **Builder: disable public signup** in Supabase → Authentication → Providers. Not yet confirmed.
 - [ ] Builder: confirm the Netlify publish directory is `dist`, the build command is `npm run build`,

@@ -1,0 +1,21 @@
+# Build settings for the Supplier Review Dashboard.
+#
+# These live here rather than only in the Netlify dashboard because netlify.toml
+# takes precedence over the UI build settings: a site published from the repo
+# root instead of dist serves the raw index.html, whose /src/main.jsx entry does
+# not exist in production, and the result is a blank page.
+#
+# Deliberately NOT here: the two VITE_ variables and SECRETS_SCAN_OMIT_KEYS.
+# Those are Netlify environment variables set by the builder in the dashboard,
+# and no project URL or key belongs in a committed file.
+#
+# SPA routing stays in public/_redirects, which ships to dist/_redirects. It is
+# not duplicated here, because netlify.toml redirects would override that file
+# and leave two sources of truth.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"

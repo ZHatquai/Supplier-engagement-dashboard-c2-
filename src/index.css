@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+
+/* ---------------------------------------------------------------------------
+   The Corporate — brand tokens and primitives.
+   Governed by .claude/skills/the-corporate-brand/SKILL.md.
+   These sit before @tailwind utilities on purpose: emitted after the utilities
+   layer, their hardcoded colours would beat any text-* utility on the same
+   element.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --tc-ink:      #000000;
+  --tc-graphite: #4A453B;
+  --tc-slate:    #8C8674;
+  --tc-stone:    #B6B09F;
+  --tc-linen:    #EAE4D5;
+  --tc-chalk:    #F2F2F2;
+  --tc-white:    #FFFFFF;
+
+  --tc-bg-page:      var(--tc-chalk);
+  --tc-bg-surface:   var(--tc-linen);
+  --tc-bg-elevated:  var(--tc-white);
+  --tc-text-primary: var(--tc-ink);
+  --tc-text-muted:   var(--tc-graphite);
+  --tc-text-muted-on-ink: var(--tc-stone);
+  --tc-text-numeral: var(--tc-slate);
+  --tc-border:        rgba(182, 176, 159, 0.35);
+  --tc-border-strong: var(--tc-stone);
+  --tc-border-input:  var(--tc-slate);
+
+  --tc-lime: #C8F135;
+
+  --tc-space-xs:  4px;
+  --tc-space-sm:  8px;
+  --tc-space-md:  16px;
+  --tc-space-lg:  24px;
+  --tc-space-xl:  40px;
+  --tc-space-2xl: 64px;
+  --tc-space-3xl: 96px;
+  --tc-max-width: 1120px;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--tc-bg-page);
+  color: var(--tc-text-primary);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 300;
+  font-size: 15px;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+}
+
+*, *::before, *::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Type scale ------------------------------------------------------------- */
+
+.tc-h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 48px; font-weight: 700; line-height: 1.05; letter-spacing: -0.01em; color: var(--tc-ink); margin: 0; }
+.tc-h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; line-height: 1.15; color: var(--tc-ink); margin: 0; }
+.tc-h3 { font-family: 'DM Sans', system-ui, sans-serif; font-size: 18px; font-weight: 500; line-height: 1.3; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tc-ink); margin: 0; }
+.tc-subhead { font-family: 'DM Sans', system-ui, sans-serif; font-size: 13px; font-weight: 500; line-height: 1.4; letter-spacing: 0.16em; text-transform: uppercase; color: var(--tc-text-muted); }
+.tc-body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; font-weight: 300; line-height: 1.75; color: var(--tc-ink); }
+.tc-label { font-family: 'DM Sans', system-ui, sans-serif; font-size: 11px; font-weight: 400; line-height: 1.5; letter-spacing: 0.12em; text-transform: uppercase; color: var(--tc-text-muted); }
+
+@media (max-width: 768px) {
+  .tc-h1 { font-size: 34px; }
+  .tc-h2 { font-size: 25px; }
+}
+
+/* Surfaces --------------------------------------------------------------- */
+
+.tc-card {
+  background: var(--tc-bg-surface);
+  border: 0.5px solid var(--tc-border-strong);
+  padding: var(--tc-space-lg);
+}
+
+.tc-card-elevated {
+  background: var(--tc-bg-elevated);
+  border: 0.5px solid var(--tc-border);
+  padding: var(--tc-space-lg);
+}
+
+.tc-divider { height: 0.5px; background: var(--tc-border); border: 0; margin: var(--tc-space-xl) 0; }
+.tc-divider-strong { height: 1px; background: var(--tc-stone); border: 0; margin: var(--tc-space-xl) 0; }
+
+/* Controls --------------------------------------------------------------- */
+
+.tc-btn-primary {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 13px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+  background: var(--tc-ink); color: var(--tc-chalk);
+  border: 0.5px solid var(--tc-ink); padding: 12px 28px; cursor: pointer;
+}
+.tc-btn-primary:hover:not(:disabled) { background: #1a1a1a; }
+.tc-btn-primary:disabled { background: var(--tc-slate); border-color: var(--tc-slate); cursor: not-allowed; }
+
+.tc-btn-secondary {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 13px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+  background: transparent; color: var(--tc-ink);
+  border: 0.5px solid var(--tc-ink); padding: 12px 28px; cursor: pointer;
+}
+.tc-btn-secondary:hover:not(:disabled) { background: var(--tc-chalk); }
+.tc-btn-secondary:disabled { color: var(--tc-slate); border-color: var(--tc-stone); cursor: not-allowed; }
+
+.tc-input, .tc-select, .tc-textarea {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 14px; font-weight: 300; color: var(--tc-ink);
+  background: var(--tc-white);
+  border: 0.5px solid var(--tc-border-input);
+  padding: 10px 14px; width: 100%; outline: none;
+}
+.tc-textarea { line-height: 1.6; resize: vertical; }
+.tc-input:focus, .tc-select:focus, .tc-textarea:focus { border-color: var(--tc-ink); }
+.tc-input::placeholder, .tc-textarea::placeholder { color: var(--tc-text-muted); }
+.tc-select:disabled { background: var(--tc-chalk); color: var(--tc-slate); cursor: not-allowed; }
+
+/* Tables ----------------------------------------------------------------- */
+
+.tc-table { width: 100%; border-collapse: collapse; font-family: 'DM Sans', system-ui, sans-serif; font-size: 14px; }
+.tc-table th {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--tc-text-muted); padding: 10px 12px; text-align: left;
+  border-bottom: 0.5px solid var(--tc-stone); white-space: nowrap;
+}
+.tc-table td { padding: 10px 12px; color: var(--tc-ink); font-weight: 300; border-bottom: 0.5px solid var(--tc-border); }
+.tc-table tbody tr:nth-child(even) td { background: var(--tc-chalk); }
+.tc-table tbody tr.tc-row-clickable { cursor: pointer; }
+.tc-table tbody tr.tc-row-clickable:hover td { background: var(--tc-linen); }
+
+/* Focus visibility ------------------------------------------------------- */
+
+:focus-visible { outline: 2px solid var(--tc-ink); outline-offset: 2px; }
+
+@tailwind utilities;

@@ -2,13 +2,20 @@
 
 > Claude Code: read this file at the start of every session, before touching anything. Update it at every save point. Replace content, do not append. History lives in git.
 
-**Session:** 1 — first build session
+**Session:** 2 — test pass against the live project
 **Last updated:** 14 September 2026
 **Live URL:** none yet [Rule: fill in after the first successful deploy]
 
 ## Current state
 
-The dashboard is built and the database work is done. Nothing is deployed yet.
+The dashboard is built, the database work is done, and the whole tool has now been tested against
+the live project with a 32-row seeded dataset. Nothing is deployed yet.
+
+**Test data is currently loaded in the shared live table.** 32 rows across 25 companies, seeded from
+`docs/test-data/seed-test-submissions.sql`. Every contact identity is fabricated and every email uses
+the reserved `.example` TLD. This table is shared with Tool A, so these names also take part in Tool
+A's duplicate matching. Run `docs/test-data/teardown-test-submissions.sql` as `service_role` before
+the three colleagues start using the tool for real.
 
 **Database — "The corporate live build (New)", complete and verified.** The three nullable resolution
 columns (`resolved_by`, `resolved_at`, `resolution_note`) are on `submissions`, with no default, no
@@ -34,26 +41,41 @@ the blocked-confirm prompt. `npm run build` succeeds.
 email confirmed. They were created with temporary passwords that the builder must rotate — see Known
 issues.
 
-**Verification done this session.** Every status transition, the blocked confirm, the accept path,
-and the paired resolution were exercised against the live database through the two functions and
-behaved exactly as specified. 43 logic assertions on the flag rules, the flag scope, the EcoVadis
-non-assessable case, and the CSV column set all pass. The filter interlock was driven in a real
-browser. The register, overview, detail and review pages were rendered and checked at 1280px and
-390px with no horizontal page overflow.
+**Verified against the seeded dataset — 281 assertions, all passing.**
+- 150 against the shipped `src/lib` modules: the seven flag directions, the flag scope, the four
+  baked-in edge cases (blank, `Maybe`, case and whitespace variants, absent key), the EcoVadis
+  non-assessable case and its sort position in both directions, the AND semantics of the flag filter,
+  and the CSV column set.
+- 107 driving the real React app in Chromium against the seeded rows: the login gate, overview totals
+  and counters, the flag board, the filter interlock and its restore behaviour, the register with
+  search, filters, sort and export, the detail page including the four edge cases, the paired review,
+  the blocked-confirm prompt and its accept path, the brand rules (no radius, no shadows, Acid Lime
+  within its cap, Chalk ground) and no horizontal page overflow at 1280px or 390px.
+- 24 against the live database, calling both functions as `authenticated` with a real JWT: every
+  refusal (blank note, null note, unknown action, wrong status, unknown id, no session), the blocked
+  confirm writing nothing, the accept path, the clean confirm, decline, flag on a superseded row, the
+  second flag refused, and the privilege model (`authenticated` holds no insert, update or delete;
+  `anon` holds no select and no execute on either function).
+
+All four of the seed's own verification queries match `docs/test-data/TEST-DATA-README.md` exactly:
+the 22/6/4 status mix, the 12-row flag board with counts 0,1,2,2,2,3,3,3,4,5,6,7, the six companies
+holding more than one row, and the 25-key row against 26 keys everywhere else.
 
 ## Last session
 
-Session 1. Ran First Session Setup, then built the whole tool. Applied the schema delta and both
-review functions via MCP and verified the privilege model in-database. Read the 26 real answer keys
-from a live row. Built the React frontend end to end and rewrote `docs/supabase-setup.md` as the
-shared source of truth for both tools. Created the three auth accounts. Could not test the browser
-against the live project: this container's network policy blocks the Supabase host, so the UI was
-verified against fixture data instead.
+Session 2. Seeded the 32-row test dataset into the live table and ran a full test pass: 281
+assertions, all passing. 150 against the shipped `src/lib` modules, 107 driving the real React app in
+Chromium, and 24 against the live database calling both review functions as `authenticated` with a
+real JWT. All four of the seed's own verification queries match the README exactly. Both functions
+and the privilege model were verified in-database, then the five rows the write tests moved were
+restored to their seeded values, so the dataset is pristine again. `npm run build` succeeds. No code
+and no schema was changed this session. The browser still cannot reach the Supabase host from this
+container, so the browser-to-Supabase network seam is the one thing still untested.
 
 ## Remaining work
 
-- [ ] **Builder: merge `claude/dazzling-ptolemy-lsix9p` into `main`.** The session was pinned to a
-      feature branch, so Netlify has not seen this code. Nothing deploys until main moves.
+- [ ] **Builder: merge `claude/cool-albattani-fa32k2` into `main`.** Sessions are pinned to a feature
+      branch, so Netlify only sees this code once main moves. The session-1 branch is already merged.
 - [ ] **Builder: rotate the three temporary account passwords** in Supabase → Authentication → Users.
 - [ ] **Builder: disable public signup** in Supabase → Authentication → Providers. Not yet confirmed.
 - [ ] Builder: confirm the Netlify publish directory is `dist`, the build command is `npm run build`,
@@ -61,15 +83,21 @@ verified against fixture data instead.
 - [ ] Builder: upgrade the Supabase project to Pro (manual billing step) before the three colleagues
       start using it. `docs/supabase-setup.md` already records Pro as the intended plan.
 - [ ] Live test pass after deploy: sign in as each of the three accounts, take one real decision, and
-      verify the row in the Supabase table editor
-- [ ] Verify acceptance criteria 1, 2, 3, 6, 20, 24 against the deployed site — these need a live
-      browser and a second session and could not be closed from this container
-- [ ] Delete the `ZZ Blocked Test` rows once the live test pass is done, if they are not wanted as
-      demo data
+      verify the row in the Supabase table editor. This closes the one seam the session-2 test pass
+      could not reach: the browser-to-Supabase network call, the real auth session, and RLS under a
+      genuine JWT.
+- [ ] Walk the five by-hand scenarios in `docs/test-data/TEST-DATA-README.md` on the deployed site.
+      Their logic is already verified; what is left is the live round trip.
+- [ ] **Run `docs/test-data/teardown-test-submissions.sql` before the three colleagues use the tool
+      for real**, so the register they see holds only real suppliers. The seeded contact data is
+      fabricated but personal-shaped, sits under the same RLS, and lands in the CSV export.
 - [ ] Optional: replace the 19 non-flag question labels in `src/lib/questionnaireSchema.js` with
       Tool A's exact strings from `src/lib/questionnaireSchema.js` — see Known issues
 - [ ] Builder: copy the updated `docs/supabase-setup.md` back into Tool A's repo so the two tools do
       not drift on schema truth
+- [ ] Optional: keep the session-2 test harness. It lived in a scratch directory and was not
+      committed, so re-running it means rebuilding it. Say the word if it should become part of the
+      repo; it would add Playwright as a dev dependency.
 
 ## Build decisions
 
@@ -104,6 +132,9 @@ verified against fixture data instead.
 
 ## Known issues
 
+- **The 32 seeded test rows are live in the shared table right now.** See Current state. They are
+  fabricated, but they are visible to Tool B users, count in Tool A's duplicate matching, and export
+  to CSV like any other row. The teardown script removes them and nothing else.
 - **The three account passwords are temporary and were set by Claude Code, not by the builder.** They
   were handed over in the build session chat and are recorded in no file. Rotate all three in the
   Supabase dashboard before the colleagues use the tool. The accounts were created by direct insert
@@ -120,6 +151,10 @@ verified against fixture data instead.
 - The live table holds four `ZZ Blocked Test` rows created this session to exercise the blocked
   confirm and the paired resolution through Tool A's own submit path. Two are the ZZ pair; the others
   are the pre-existing `SustainOS test` rows. Delete the ZZ rows when they are no longer wanted.
+- Confirmed correct, not a defect: `send_company_to_review` writes `resolved_by` and `resolved_at`
+  but leaves `resolution_note` as it was, so a row can briefly show an older note beside a newer
+  timestamp. Spec Section 6 requires exactly this, because no note is taken at that step; the note
+  arrives with the decision that follows. Checked during the session-2 test pass.
 - Spec Section 9 contains a contradiction. The prose sentence below the flag table says three flags
   raise on No and four on Yes; the per-question table says the opposite. The table is authoritative and
   the build follows it: four raise on No (SBTi, human rights policy, due diligence, conflict minerals)

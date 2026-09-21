@@ -2,231 +2,292 @@
 
 > Claude Code: read this file at the start of every session, before touching anything. Update it at every save point. Replace content, do not append. History lives in git.
 
-**Session:** 2 — test pass against the live project
-**Last updated:** 20 September 2026
+**Session:** 3 — the v2.1 authorization upgrade
+**Last updated:** 21 September 2026
 **Live URL:** none yet [Rule: fill in after the first successful deploy]
 
 ## Current state
 
-The dashboard is built, the database work is done, and the whole tool has now been tested against
-the live project with a 32-row seeded dataset. Nothing is deployed yet.
+v2.1 is built. The access model moved from A2 to A3 this session: three functional roles, an Admin
+flag, a User Management panel, and a Change Password screen. Nothing is deployed yet.
 
-**Test data is currently loaded in the shared live table.** 32 rows across 25 companies, seeded from
-`docs/test-data/seed-test-submissions.sql`. Every contact identity is fabricated and every email uses
-the reserved `.example` TLD. This table is shared with Tool A, so these names also take part in Tool
-A's duplicate matching. Run `docs/test-data/teardown-test-submissions.sql` as `service_role` before
-the three colleagues start using the tool for real.
+**Database — "The corporate live build (New)", complete and verified.** Four named migrations
+applied and saved as files in `supabase/migrations/`:
 
-**Database — "The corporate live build (New)", complete and verified.** The three nullable resolution
-columns (`resolved_by`, `resolved_at`, `resolution_note`) are on `submissions`, with no default, no
-`NOT NULL`, and no check constraint. Both review functions exist: `resolve_submission(uuid, text, text)`
-and `send_company_to_review(uuid)`, SECURITY DEFINER, `search_path` pinned to `public, pg_temp`,
-EXECUTE revoked from `public` and `anon` and granted to `authenticated` only, both taking the same
-advisory lock on the normalised company name that Tool A's `submit_submission` takes. The
-`authenticated` SELECT policy and grant were already in place before this session and were left
-alone. `anon` still holds zero policies and zero grants, verified in-database on the table and on all
-four functions. Tool A still submits correctly on both routes after the column addition.
+- `user_role` enum (`ehs`, `esg`, `procurement`) and the `profiles` table (`user_id` PK referencing
+  `auth.users(id)`, `email`, `role`, `is_admin`, `is_active`, `created_at`, `updated_at`,
+  `updated_by`). No `created_by`, no history table, no extra index.
+- `profiles` seeded for the three v1.0 accounts, matched on email so no generated id sits in a
+  committed file: `sustaintrend@gmail.com` as `ehs`, `z.hatquai@sustainos.io` as `esg` with
+  `is_admin = true`, `z.hatquai@gmail.com` as `procurement`.
+- RLS enabled **and forced** on `profiles`, one `SELECT` policy and grant for `authenticated`.
+  This project's default privileges hand every new public table to `anon` and `authenticated`
+  outright, so the migration revokes everything first and grants back only `SELECT`.
+- The role check inside `resolve_submission` and `send_company_to_review`: caller's `profiles.role`
+  must be `ehs` or `esg`, else `not_authorized` and nothing is written. Placed immediately after the
+  `no_session` check so v1.0's error taxonomy is unchanged, and before any argument is validated or
+  any row is read.
+- `set_user_role`, new, with both refusals: not an admin, or the target is the caller's own row.
 
-**The seven answer keys are read from live data, not guessed.** All 26 questionnaire keys were read
-from a real questionnaire-route row and are recorded in `docs/supabase-setup.md` and
-`src/lib/questionnaireSchema.js`.
+**The one admin Netlify Function is built** — `netlify/functions/admin-users.js`, three actions
+behind one endpoint (`invite`, `set_active`, `reset_password`). It validates the caller's Supabase
+access token and re-reads their `profiles.is_admin` on every request before doing anything, so a
+non-admin hitting the endpoint directly gets 403 whatever the panel rendered. `set_active` also
+refuses a self-target. One-time passwords are generated with `node:crypto`, returned once, and
+written to no log, column, or file.
 
-**Frontend — every view in the spec is built.** Login, Tab 1 (Overview totals, route pie chart, the
-two counters, the Risk Flag Board with the filter interlock), Tab 2 (Supplier Register with sort,
-search, filters and CSV export), Supplier Detail (identity, answers by section, risk summary,
-resolution trail, same-company history, action area), the Review Page (paired and single cases), and
-the blocked-confirm prompt. `npm run build` succeeds.
+**The service role key reaches nothing it should not.** `SERVICE_ROLE` and `service_role` appear
+nowhere in `src/` or in the built `dist/`, and no JWT-shaped literal appears in either. Verified
+after a clean rebuild (spec item 33, local half).
 
-**Three Supabase Auth accounts exist** for the ESG lead, EHS, and procurement, email and password,
-email confirmed. They were created with temporary passwords that the builder must rotate — see Known
-issues.
+**Frontend — every v2.1 screen is built.** Change Password (any role, own password only, current
+password checked by re-authenticating first), User Management (roster, invite, role and Admin-flag
+save, deactivate/reactivate, reset password, one-time password panel with a copy button), the
+Admin-only nav link, the role-conditional action area on Supplier Detail, and route guards on
+`/users` and `/review/:id`. `npm run build` succeeds.
 
-**Verified against the seeded dataset — 281 assertions, all passing.**
-- 150 against the shipped `src/lib` modules: the seven flag directions, the flag scope, the four
-  baked-in edge cases (blank, `Maybe`, case and whitespace variants, absent key), the EcoVadis
-  non-assessable case and its sort position in both directions, the AND semantics of the flag filter,
-  and the CSV column set.
-- 107 driving the real React app in Chromium against the seeded rows: the login gate, overview totals
-  and counters, the flag board, the filter interlock and its restore behaviour, the register with
-  search, filters, sort and export, the detail page including the four edge cases, the paired review,
-  the blocked-confirm prompt and its accept path, the brand rules (no radius, no shadows, Acid Lime
-  within its cap, Chalk ground) and no horizontal page overflow at 1280px or 390px.
-- 24 against the live database, calling both functions as `authenticated` with a real JWT: every
-  refusal (blank note, null note, unknown action, wrong status, unknown id, no session), the blocked
-  confirm writing nothing, the accept path, the clean confirm, decline, flag on a superseded row, the
-  second flag refused, and the privilege model (`authenticated` holds no insert, update or delete;
-  `anon` holds no select and no execute on either function).
-
-All four of the seed's own verification queries match `docs/test-data/TEST-DATA-README.md` exactly:
-the 22/6/4 status mix, the 12-row flag board with counts 0,1,2,2,2,3,3,3,4,5,6,7, the six companies
-holding more than one row, and the 25-key row against 26 keys everywhere else.
+**Refusal test half A is done and recorded below — 74 assertions, all passing: 36 against the live
+database and 38 against the screens.** Half B, the four named people on the real screens, is still
+outstanding and gates the deploy.
 
 ## Last session
 
-Session 2. Seeded the 32-row test dataset into the live table and ran a full test pass: 281
-assertions, all passing. 150 against the shipped `src/lib` modules, 107 driving the real React app in
-Chromium, and 24 against the live database calling both review functions as `authenticated` with a
-real JWT. All four of the seed's own verification queries match the README exactly. Both functions
-and the privilege model were verified in-database, then the five rows the write tests moved were
-restored to their seeded values, so the dataset is pristine again. `npm run build` succeeds. No code
-and no schema was changed this session. The browser still cannot reach the Supabase host from this
-container, so the browser-to-Supabase network seam is the one thing still untested.
+Session 3. Built the whole v2.1 upgrade: four migrations applied to the live project and saved as
+files, the admin Netlify Function, the Change Password screen, the User Management panel, the
+role-conditional action area, and the two route guards. Ran refusal test half A — 74 assertions,
+all passing — and updated `docs/supabase-setup.md` to match.
+
+One real bug was found and fixed by the screen harness rather than by reading: on a deep link or a
+refresh, `AuthContext` briefly reported "profile resolved" for a session whose profile had not been
+fetched yet, so the role-conditional routes rendered against a role nobody had read. An Admin
+opening `/users` directly was bounced to the Overview. The resolved flag is now derived from which
+account the loaded profile belongs to, so it cannot be true for the wrong session.
 
 ## Remaining work
 
-- [ ] **Builder: merge `claude/cool-albattani-fa32k2` into `main`.** Sessions are pinned to a feature
-      branch, so Netlify only sees this code once main moves. The session-1 branch is already merged.
-- [ ] **Builder: rotate the three temporary account passwords** in Supabase → Authentication → Users.
+Carried from v1.0, still open:
+
+- [ ] **Builder: rotate the three temporary account passwords.** Easiest route now is the new
+      panel's Reset password action, once deployed — see Open questions in spec Section 15.
 - [ ] **Builder: disable public signup** in Supabase → Authentication → Providers. Not yet confirmed.
-- [ ] Builder: confirm the Netlify publish directory is `dist`, the build command is `npm run build`,
-      and `SECRETS_SCAN_OMIT_KEYS` is saved alongside both `VITE_` variables
-- [ ] Builder: upgrade the Supabase project to Pro (manual billing step) before the three colleagues
-      start using it. `docs/supabase-setup.md` already records Pro as the intended plan.
-- [ ] Live test pass after deploy: sign in as each of the three accounts, take one real decision, and
-      verify the row in the Supabase table editor. This closes the one seam the session-2 test pass
-      could not reach: the browser-to-Supabase network call, the real auth session, and RLS under a
-      genuine JWT.
-- [ ] Walk the five by-hand scenarios in `docs/test-data/TEST-DATA-README.md` on the deployed site.
-      Their logic is already verified; what is left is the live round trip.
-- [ ] **Run `docs/test-data/teardown-test-submissions.sql` before the three colleagues use the tool
-      for real**, so the register they see holds only real suppliers. The seeded contact data is
-      fabricated but personal-shaped, sits under the same RLS, and lands in the CSV export.
-- [ ] Optional: replace the 19 non-flag question labels in `src/lib/questionnaireSchema.js` with
-      Tool A's exact strings from `src/lib/questionnaireSchema.js` — see Known issues
+- [ ] Builder: confirm the Netlify publish directory is `dist` and the build command is
+      `npm run build`, and that `SECRETS_SCAN_OMIT_KEYS` is saved alongside both `VITE_` variables
+- [ ] Builder: upgrade the Supabase project to Pro (manual billing step)
 - [ ] Builder: copy the updated `docs/supabase-setup.md` back into Tool A's repo so the two tools do
       not drift on schema truth
-- [ ] Optional: keep the session-2 test harness. It lived in a scratch directory and was not
-      committed, so re-running it means rebuilding it. Say the word if it should become part of the
-      repo; it would add Playwright as a dev dependency.
-- [ ] (v2.1 revision) Builder: `product-spec.md` (v2.1) replaces the v1.0 copy at the repo root
-- [ ] (v2.1 revision) Builder: add `SUPABASE_SERVICE_ROLE_KEY` as a Netlify environment variable,
-      not `VITE_`-prefixed — the key exists on the project but was not yet in this tool's environment
-- [ ] (v2.1 revision) Create the `user_role` enum and the `profiles` table per spec Section 5 (a
-      named migration saved as a file in `supabase/migrations/`)
-- [ ] (v2.1 revision) Seed `profiles` for the three existing accounts (role per spec Section 2,
-      `is_admin = true` on the confirmed ESG Lead account — z.hatquai@sustainos.io — only)
-- [ ] (v2.1 revision) Add the `authenticated` SELECT policy and grant on `profiles` per
-      access-matrix.md Section 6
-- [ ] (v2.1 revision) Add the role check to `resolve_submission` and `send_company_to_review`
-      (`profiles.role` must be `ehs` or `esg`, else `not_authorized`, nothing written)
-- [ ] (v2.1 revision) Build `set_user_role` — admin-gated, refuses a self-targeted change with no
-      exception for the sole Admin, validates `p_role`
-- [ ] (v2.1 revision) Build the one admin Netlify Function (invite / set_active / reset_password),
-      service role key read server-side only, `set_active` refuses a self-targeted deactivation
-- [ ] (v2.1 revision) Build the Change Password screen and the User Management panel per spec
-      Section 8, including the disabled controls on the signed-in Admin's own row
-- [ ] (v2.1 revision) Update Supplier Detail so the action area is role-conditional (no action area
-      renders at all for Procurement, at any status)
-- [ ] (v2.1 revision) Verify in-database that `anon` still holds zero privilege on `submissions` and
-      on `profiles`, and that `authenticated` holds no direct write grant on either
-- [ ] (v2.1 revision) Update `docs/supabase-setup.md`: the new enum, the new table, the new RLS
-      policy and grant, the two changed functions plus `set_user_role`, the new environment
-      variable, and the last-updated line
-- [ ] (v2.1 revision) Refusal test, half A (Claude Code, via the API) — every `no` cell in
-      access-matrix.md Section 1, both self-change refusals in particular, tried as each named
-      person's session and as a logged-out visitor; paste the results into Refusal test record below
-- [ ] (v2.1 revision) Local test pass against the live project: every acceptance criterion in spec
-      Section 13, including 32a (self-change refusal) and 33 (service role key never in the bundle)
-- [ ] (v2.1 revision) Refusal test, half B (the four named people, on the screens) — do not deploy
-      this phase until it passes; Procurement confirms the action area truly does not render, the
-      ESG Lead confirms their own role/flag/active controls refuse to apply to their own row
-- [ ] (v2.1 revision) Push to main, Netlify auto-deploys
-- [ ] (v2.1 revision) Confirm live: all four accounts sign in and see the correct rights; an invite,
-      a deactivate/reactivate, and a password reset each work end to end against the live project
+- [ ] Optional: replace the 19 non-flag question labels in `src/lib/questionnaireSchema.js` with
+      Tool A's exact strings — see Known issues
+
+New for v2.1, in order:
+
+- [ ] **Builder: merge `claude/brave-feynman-1glm48` into `main`.** This session was pinned to a
+      feature branch, so Netlify only sees v2.1 once main moves. Sessions 1 and 2's branches are
+      already merged.
+- [ ] **Builder: add `SUPABASE_SERVICE_ROLE_KEY` as a Netlify environment variable, not
+      `VITE_`-prefixed.** The key exists on the project but is not yet in this tool's environment.
+      **Until it is, the User Management panel's three actions return "This function is not
+      configured" and nothing else in the tool is affected.**
+- [ ] **Refusal test half B — the four named people, on the screens.** Do not consider this phase
+      done until it passes. Procurement confirms no action area renders on Supplier Detail at any
+      status and that User Management is absent from the header; EHS confirms the same absence;
+      the ESG Lead confirms their own row's role dropdown and Admin-flag and Deactivate toggles are
+      disabled and that Reset password still works on it.
+- [ ] Live test pass after deploy: all four accounts sign in and see the correct rights; an invite,
+      a deactivate/reactivate, and a password reset each work end to end. This closes the two seams
+      no local session can reach — the browser-to-Supabase network call under a genuine JWT, and the
+      admin Netlify Function, which cannot run without Netlify and the service role key.
+- [ ] Spec Section 13 items that can only be closed live: 28 (a direct call to the admin endpoint as
+      a non-admin returns 403), 29 (invite), 30 (deactivate/reactivate), 31 (reset password), and the
+      deployed-bundle half of 33.
+- [ ] Walk the five by-hand scenarios in `docs/test-data/TEST-DATA-README.md` on the deployed site.
+- [ ] **Run `docs/test-data/teardown-test-submissions.sql` before the three colleagues use the tool
+      for real**, so the register they see holds only real suppliers.
+- [ ] Builder, optional but cheap: turn on leaked-password protection in Supabase → Authentication.
+      The security advisor flags it as off, and the tool now issues starter passwords.
 
 ## Refusal test record
 
-None yet. [Rule: filled by Claude Code at half A and by the builder at half B — date, who, cell
-tried, result. Kept, never cleared; the handover package copies it. Any change to a rule re-runs
-both halves before the push.]
+**Half A — Claude Code, 21 September 2026, against the live project. 74 assertions, all passing:
+14 at grant level, 17 at function level, 5 on the write paths, and 38 on the screens.**
+Recorded per `docs/access-matrix.md` Section 6. Nothing below wrote anything: the refusals write
+nothing by design, and the two write-path checks ran inside a transaction that was rolled back. The
+three accounts and the one test row were re-read afterwards and are byte-for-byte as they were.
+
+*Method.* The browser and `curl` in the build container cannot reach the Supabase host — the
+environment's network policy refuses the CONNECT — so half A ran in-database through the Supabase
+MCP, setting `request.jwt.claims` on the connection exactly as PostgREST sets it for a signed-in
+caller, and under `SET LOCAL ROLE` for the grant-level checks. The admin Netlify Function's three
+endpoints cannot be exercised at all without Netlify and the service role key; they are listed
+under Remaining work and are half B's and the live pass's to close.
+
+**Grant level — attempted, not just inspected.**
+
+| Role | Attempt | Result |
+|---|---|---|
+| authenticated | `SELECT` on `submissions`, on `profiles` | allowed, both |
+| authenticated | `INSERT`, `UPDATE`, `DELETE` on `submissions` | refused, 42501, all three |
+| authenticated | `INSERT`, `UPDATE`, `DELETE` on `profiles` | refused, 42501, all three |
+| anon | `SELECT` on `submissions`, on `profiles` | refused, 42501, both |
+| anon | `EXECUTE` on `resolve_submission`, `send_company_to_review`, `set_user_role`, `submit_submission` | refused, 42501, all four |
+
+**Function level — as each named person's session.**
+
+| # | Who | Tried | Result |
+|---|---|---|---|
+| R1 | Procurement Manager | `resolve_submission(needs_review row, confirm, note)` | `not_authorized` |
+| R2 | Procurement Manager | `resolve_submission(active row, flag, note)` | `not_authorized` |
+| R3 | Procurement Manager | `resolve_submission(an id that does not exist, confirm, note)` | `not_authorized` — refused before the row is looked up |
+| R4 | logged-out visitor | `resolve_submission(...)` | `no_session` |
+| R5 | EHS Manager | `resolve_submission(an id that does not exist, ...)` | `not_found` — control, role gate passed |
+| R6 | EHS Manager | `resolve_submission(active row, flag, blank note)` | `note_required` — control |
+| R7 | ESG Lead | `resolve_submission(needs_review row, bogus action, note)` | `invalid_action` — control |
+| S1 | Procurement Manager | `send_company_to_review(needs_review row)` | `not_authorized` |
+| S2 | logged-out visitor | `send_company_to_review(...)` | `no_session` |
+| S3 | EHS Manager | `send_company_to_review(an id that does not exist)` | `not_found` — control |
+| U1 | EHS Manager | `set_user_role(Procurement Manager, esg, admin=true)` | `not_authorized` |
+| U2 | Procurement Manager | `set_user_role(EHS Manager, esg, admin=true)` | `not_authorized` |
+| U3 | logged-out visitor | `set_user_role(...)` | `no_session` |
+| **U4** | **ESG Lead (Admin)** | **`set_user_role(their OWN row, procurement)` — self role change** | **`not_authorized`, nothing written** |
+| **U5** | **ESG Lead (Admin)** | **`set_user_role(their OWN row, esg, admin=false)` — dropping their own Admin flag** | **`not_authorized`, nothing written** |
+| U6 | ESG Lead (Admin) | `set_user_role(Procurement Manager, bogus role)` | `invalid_role` — control, admin gate passed |
+| U7 | ESG Lead (Admin) | `set_user_role(an id with no profile, ehs)` | `not_found` — control |
+
+**Write paths, inside a rolled-back transaction.**
+
+| # | What | Result |
+|---|---|---|
+| W1 | EHS flags an active row | `ok`, status `needs_review`, `resolved_by` the EHS Manager's email — v1.0's write path is intact |
+| W2a | Admin sets the Procurement Manager's role to `ehs` | `ok`, `updated_by` the ESG Lead's email |
+| W2b | that same account confirms on its **very next call**, no re-login | `ok`, status `active` — spec item 32 |
+| W2c | Admin sets the role back to `procurement` | `ok` |
+| W2d | that account tries again | `not_authorized`, immediately |
+
+**Screen level — 38 assertions, all passing.** The real shipped `App`, `AppShell`, pages, contexts,
+and `lib` modules rendered in jsdom with only `src/lib/supabase.js` replaced by a stub, since the
+network seam is unreachable here. The harness lived in a scratch directory and was not committed.
+
+- Procurement: no action area on a `needs_review` row and none on an `active` row — not disabled
+  buttons, nothing in that space, with the read-only content above it intact; no link into the
+  review page; `/users` redirects to the Overview and the panel does not render; `/review/:id`
+  redirects to the submission; no User Management link in the header; Change password link present;
+  export still available on the register.
+- EHS: action area renders at every applicable status, the review page is reachable and renders,
+  no User Management link, `/users` still redirects.
+- ESG with the Admin flag: the nav link renders, the panel renders with the roster, and on **their
+  own row** the role dropdown, the Admin-flag toggle, the Deactivate toggle, and Save role are all
+  disabled with the inline note pointing at the Supabase dashboard, while Reset password stays
+  available — and the same controls on another row are all enabled.
+- Change Password: a wrong current password is refused inline and calls no update; the right one
+  saves and calls `updateUser` exactly once.
+- No Acid Lime on either new screen, as the brand rule requires.
+
+[Rule: kept, never cleared; the handover package copies it. Any change to a rule re-runs both halves
+before the push.]
 
 ## Build decisions
 
-- Plain Tailwind components with `.tc-*` brand primitives instead of shadcn/ui. shadcn ships rounded
-  corners and shadows by default, and the brand forbids both; overriding every component was more
-  work than writing the handful of primitives the tool needs.
-- `border-radius` and `box-shadow` are disabled at the Tailwind core-plugin level and forced off in
-  CSS, so the brand rule cannot be broken by a stray utility class.
-- Acid Lime is used once per page, never twice: the needs-review counter on Tab 1 (lime text in a
-  black container) and the blocked-confirm callout (2px lime left border). The pie chart, all three
-  status badges, and all seven flag indicators are neutral-palette only.
-- Flag indicators are a filled Ink square when raised and a Stone hairline outline when not. No
-  colour carries meaning anywhere in the tool.
-- The flag board's status control is fixed at Active and disabled. The spec says both that the board
-  shows active rows only and that the interlock "sets status to active"; pinning the control satisfies
-  both without ever rendering a needs_review or superseded row on the board. The route control is
-  free until a flag filter is selected.
-- Register filter state lives in the URL query string, so the Overview counters can link straight to
-  a pre-filtered register and a reviewer can share a filtered view.
-- The paired resolution issues the confirm first and the declines after. A blocked confirm writes
-  nothing at all, so the declines are never issued against a decision that did not happen.
-- Both functions return a structured `jsonb` result (`ok`, `error`, `message`) rather than raising,
-  so the browser handles a refusal and the blocked confirm through one code path.
-- `resolve_submission` also returns a `conflicts` array with each conflicting row's route and
-  `created_at`, on top of the `conflicting_ids` and `conflicting_count` the spec requires, so the
-  prompt can name the conflicting submission without a second query.
-- CSV cells beginning `=`, `+`, `-`, or `@` are prefixed with an apostrophe, so a company name cannot
-  execute as a formula when the export is opened in a spreadsheet.
-- `groupAnswers` shows any questionnaire key the schema does not recognise under an "Other answers"
-  heading rather than dropping it, so a future workbook revision cannot silently hide a supplier's
-  answer.
+Carried from v1.0 and unchanged: plain Tailwind components with `.tc-*` primitives instead of
+shadcn/ui; `border-radius` and `box-shadow` disabled at the Tailwind core-plugin level and forced off
+in CSS; Acid Lime used once per page, never twice; flag indicators as a filled Ink square or a Stone
+hairline outline, no colour carrying meaning; the flag board's status control pinned to Active and
+disabled; register filter state in the URL query string; the paired resolution issuing the confirm
+first; both functions returning structured `jsonb` rather than raising; `resolve_submission` also
+returning a `conflicts` array; CSV cells beginning `=`, `+`, `-`, or `@` prefixed with an apostrophe;
+`groupAnswers` showing unrecognised keys under "Other answers".
+
+New this session:
+
+- The role check goes **after** the `no_session` check in both review functions, not strictly first.
+  A caller with no session still gets `no_session`, so v1.0's documented error taxonomy is unchanged,
+  and the role refusal still lands before any argument is validated and before any row is read.
+- `set_user_role`'s self-target check sits **before** `p_role` is validated, so an admin naming their
+  own `user_id` is refused with `not_authorized` whatever role they asked for. The refusal never
+  leaks which part of the request was wrong.
+- The admin function uses the Lambda-compatible `export const handler` signature rather than the
+  newer default-export form: it needs no extra dependency and no `Request`/`Response` polyfill.
+- The function reads the project URL from `SUPABASE_URL` or `VITE_SUPABASE_URL`, so the build needs
+  exactly one new environment variable rather than two.
+- One-time passwords are four groups of four from an alphabet with no `0`/`O` and no `1`/`l`/`I`.
+  They are read aloud or copied by hand during the manual handoff.
+- `netlify.toml` added, declaring only the functions directory and the esbuild bundler. The build
+  command and publish directory stay in the Netlify site settings, untouched.
+- The panel refreshes the roster **and** the signed-in account's own profile after every action, and
+  `AppShell` re-reads the profile on every navigation, so the screen agrees with the database
+  without a re-login. The database is still what enforces it.
+- Nothing role-conditional renders until the profile has resolved for the current session, so the
+  action area never flashes into view for an account that cannot act and a deep link is never
+  bounced against a role nobody has read.
+- `jsdom` was installed with `--no-save` for the screen harness only. `package.json` and
+  `package-lock.json` are unchanged.
 
 ## Known issues
 
-- **The 32 seeded test rows are live in the shared table right now.** See Current state. They are
-  fabricated, but they are visible to Tool B users, count in Tool A's duplicate matching, and export
-  to CSV like any other row. The teardown script removes them and nothing else.
-- **The three account passwords are temporary and were set by Claude Code, not by the builder.** They
-  were handed over in the build session chat and are recorded in no file. Rotate all three in the
-  Supabase dashboard before the colleagues use the tool. The accounts were created by direct insert
-  because the Supabase MCP has no user-creation tool; all three were verified in-database as correctly
-  hashed, confirmed, and carrying an email identity row.
-- **Public signup has not been confirmed as disabled.** The MCP exposes no auth-settings tool, so this
-  could not be checked or changed from the build session. The builder must verify it in the dashboard.
-  Nothing in this tool offers a signup path, but the Supabase endpoint is open until that setting is off.
-- **19 of the 26 question labels are derived, not verbatim.** Tool A's `src/lib/questionnaireSchema.js`
-  is not in this repo, so only the seven flag-bearing questions carry the exact wording from spec
-  Section 9. The other nineteen were written from the workbook's section structure and ESRS mapping.
-  They are display labels only — nothing is computed from them — and replacing the `question` values
-  in `src/lib/questionnaireSchema.js` changes nothing else.
-- The live table holds four `ZZ Blocked Test` rows created this session to exercise the blocked
-  confirm and the paired resolution through Tool A's own submit path. Two are the ZZ pair; the others
-  are the pre-existing `SustainOS test` rows. Delete the ZZ rows when they are no longer wanted.
+- **A deactivated account's existing access token stays valid until it expires.** Supabase's ban
+  refuses sign-in and refuses token refresh at once, which is what the panel's copy promises and what
+  the matrix's screen test checks, and the Supabase client signs the user out when the refresh fails.
+  But an access token already issued is verified by signature alone, so in the worst case a
+  deactivated account could still read for the remainder of the token's life (one hour by default).
+  Closing that window entirely would mean an `is_active` check inside the review functions, which
+  `docs/access-matrix.md` does not name as a mechanism, or a shorter JWT lifetime in the dashboard.
+  Recorded rather than built.
+- **The 32 seeded test rows are live in the shared table right now.** They are fabricated, but they
+  are visible to Tool B users, count in Tool A's duplicate matching, and export to CSV like any other
+  row. `docs/test-data/teardown-test-submissions.sql` removes them and nothing else. The four
+  `ZZ Blocked Test` rows from session 2 are already gone.
+- **The three account passwords are temporary and were set by Claude Code, not by the builder.**
+  Rotate all three before the colleagues use the tool. The new panel's Reset password action is the
+  easiest route once the tool is deployed and the service role key is in the environment.
+- **Public signup has not been confirmed as disabled.** The MCP exposes no auth-settings tool.
+  Nothing in this tool offers a signup path, but the Supabase endpoint is open until that setting is
+  off.
+- **19 of the 26 question labels are derived, not verbatim.** Tool A's `questionnaireSchema.js` is
+  not in this repo, so only the seven flag-bearing questions carry the exact wording from spec
+  Section 9. They are display labels only — nothing is computed from them.
+- The security advisor reports `authenticated_security_definer_function_executable` (WARN) for the
+  three Tool B functions. That is the design, not a defect: a narrow `SECURITY DEFINER` function is
+  exactly how a signed-in user writes without a table grant. The pre-existing `rls_auto_enable`
+  finding is unchanged and belongs to neither tool.
 - Confirmed correct, not a defect: `send_company_to_review` writes `resolved_by` and `resolved_at`
   but leaves `resolution_note` as it was, so a row can briefly show an older note beside a newer
-  timestamp. Spec Section 6 requires exactly this, because no note is taken at that step; the note
-  arrives with the decision that follows. Checked during the session-2 test pass.
+  timestamp. Spec Section 6 requires exactly this.
 - Spec Section 9 contains a contradiction. The prose sentence below the flag table says three flags
-  raise on No and four on Yes; the per-question table says the opposite. The table is authoritative and
-  the build follows it: four raise on No (SBTi, human rights policy, due diligence, conflict minerals)
-  and three raise on Yes (PFAS, water stress, protected area). Correct the sentence at the next spec revision.
+  raise on No and four on Yes; the per-question table says the opposite. The table is authoritative
+  and the build follows it: four raise on No (SBTi, human rights policy, due diligence, conflict
+  minerals) and three raise on Yes (PFAS, water stress, protected area). Correct the sentence at the
+  next spec revision.
 - Standing GDPR note: the CSV export moves supplier contact names outside the controlled system,
-  outside RLS, and outside any deletion process. A known limit of the tool, not a defect. No build action.
+  outside RLS, and outside any deletion process. A known limit of the tool, not a defect.
 - Standing GDPR note: deletion requests arrive at sustainability@thecorporate.com and are actioned
-  manually in the Supabase table editor. This tool builds no deletion capability and `authenticated`
-  has no delete grant. Deleting a row also destroys its resolution trail, which is accepted.
-- Expected and not a bug: if a reviewer flags a company's only active row down to needs_review and a
-  new submission then arrives, Tool A matches only against active rows, finds none, and writes the new
-  row as active. The company then holds one active row and one under review.
-- Spec revised to v2.1 on 20 September 2026 — CLAUDE.md regenerated by Project Governor. Access model
-  A2 → A3: role-based permissions, an admin panel, and a self-change refusal for every Admin replace
-  v1.0's single shared permission set.
+  manually in the Supabase table editor. `authenticated` has no delete grant on either table.
+  Deleting a `submissions` row also destroys its resolution trail, which is accepted. A `profiles`
+  row must be removed before its `auth.users` row, because the foreign key has no `ON DELETE` action.
+- Expected and not a bug: if a reviewer flags a company's only active row down to `needs_review` and
+  a new submission then arrives, Tool A matches only against active rows, finds none, and writes the
+  new row as active. The company then holds one active row and one under review.
 
 ## Backlog
 
 - Automatic invite emails — pending a sender; needs the Email arm, a verified sending domain, and
   Resend. Invite stays manual handoff (starter password shown once, handed over on Teams or in
   person) until then.
-- Self-service password reset (a forgotten-password link) — not requested; Admin's reset action in
-  the User Management panel covers it.
+- Self-service password reset (a forgotten-password link) — not requested; Admin's reset action
+  covers it.
 - An audit log of admin actions (who invited whom, who changed a role and when) — not requested.
   `profiles.updated_by`/`updated_at` show only the most recent change; a full log is a new table, not
   a redesign, if it matters later.
 - An in-app recovery path for the sole Admin's own account — not a gap to fix. v2.1 deliberately
   refuses every self-change, Admin included, so the only recovery is the platform owner acting
   directly in the Supabase dashboard.
+- A committed test suite — not in place. Sessions 2 and 3 both built throwaway harnesses in scratch
+  directories. Committing one would mean adding `jsdom` (and Playwright, for the browser half) as dev
+  dependencies, a test runner, and a script; CLAUDE.md rule 12 says build no test suite, so it stays
+  here rather than in the repo.
+- The v1.0 and Tool A migrations as files. The four v2.1 migrations are saved in
+  `supabase/migrations/`; the seven before them live only in the project's migration history.
+  Backfilling them would mean transcribing already-applied SQL — worth doing only if the project is
+  ever rebuilt from files.
 - Handover: move authentication to The Corporate's own SSO if this tool ever leaves the teaching
-  context and runs against a real corporate identity estate — unchanged note from v1.0.
+  context and runs against a real corporate identity estate.
 
 ## Notes for next session
 

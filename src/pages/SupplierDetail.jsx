@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useData } from '../context/DataContext'
+import { useAuth } from '../context/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import SubmissionAnswers from '../components/SubmissionAnswers'
 import ResolutionTrail from '../components/ResolutionTrail'
@@ -22,6 +23,7 @@ export default function SupplierDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { getById, companyRows, loading, refresh } = useData()
+  const { canReview } = useAuth()
 
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -227,62 +229,70 @@ export default function SupplierDetail() {
         )}
       </section>
 
-      <hr className="tc-divider" />
+      {/* Action area ------------------------------------------------------
+          Role-conditional from v2.1. EHS and ESG see Confirm and Decline at
+          needs_review, and Flag at active or superseded. Procurement sees no
+          action area at all — not disabled buttons, nothing in this space: the
+          page ends at the history block above. Both review functions refuse a
+          Procurement caller too, so nothing rests on this having rendered. */}
+      {canReview && (
+        <>
+          <hr className="tc-divider" />
+          <section className="tc-card">
+            <h2 className="tc-h3" style={{ fontSize: 14, marginBottom: 16 }}>Review decision</h2>
 
-      {/* Actions ---------------------------------------------------------- */}
-      <section className="tc-card">
-        <h2 className="tc-h3" style={{ fontSize: 14, marginBottom: 16 }}>Review decision</h2>
+            {needsReview ? (
+              <>
+                <p className="tc-body" style={{ marginTop: 0, marginBottom: 16 }}>
+                  This submission awaits a decision. Confirm or decline it on the review page, where every
+                  submission this company has under review is shown side by side.
+                </p>
+                <Link
+                  to={`/review/${submission.id}`}
+                  className="tc-btn-primary inline-block"
+                  style={{ textDecoration: 'none' }}
+                >
+                  Open review page
+                </Link>
+              </>
+            ) : canFlag ? (
+              <>
+                <p className="tc-body" style={{ marginTop: 0, marginBottom: 16 }}>
+                  Send this submission back to review. A note is required and is kept as part of the
+                  resolution trail. It cannot be edited afterwards.
+                </p>
+                <label className="tc-label block" htmlFor="flag-note" style={{ marginBottom: 6 }}>
+                  Note — why this goes back to review
+                </label>
+                <textarea
+                  id="flag-note"
+                  className="tc-textarea"
+                  rows={3}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  style={{ marginBottom: 16, maxWidth: 640 }}
+                />
+                <div>
+                  <button type="button" className="tc-btn-primary" disabled={busy || note.trim() === ''} onClick={onFlag}>
+                    {busy ? 'Working' : 'Flag for review'}
+                  </button>
+                </div>
+              </>
+            ) : null}
 
-        {needsReview ? (
-          <>
-            <p className="tc-body" style={{ marginTop: 0, marginBottom: 16 }}>
-              This submission awaits a decision. Confirm or decline it on the review page, where every
-              submission this company has under review is shown side by side.
-            </p>
-            <Link
-              to={`/review/${submission.id}`}
-              className="tc-btn-primary inline-block"
-              style={{ textDecoration: 'none' }}
-            >
-              Open review page
-            </Link>
-          </>
-        ) : canFlag ? (
-          <>
-            <p className="tc-body" style={{ marginTop: 0, marginBottom: 16 }}>
-              Send this submission back to review. A note is required and is kept as part of the
-              resolution trail. It cannot be edited afterwards.
-            </p>
-            <label className="tc-label block" htmlFor="flag-note" style={{ marginBottom: 6 }}>
-              Note — why this goes back to review
-            </label>
-            <textarea
-              id="flag-note"
-              className="tc-textarea"
-              rows={3}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              style={{ marginBottom: 16, maxWidth: 640 }}
-            />
-            <div>
-              <button type="button" className="tc-btn-primary" disabled={busy || note.trim() === ''} onClick={onFlag}>
-                {busy ? 'Working' : 'Flag for review'}
-              </button>
+            <div aria-live="polite" style={{ marginTop: 16 }}>
+              {message && (
+                <p
+                  className="tc-body"
+                  style={{ fontSize: 14, margin: 0, color: message.kind === 'error' ? '#C0392B' : '#2E7D32' }}
+                >
+                  {message.text}
+                </p>
+              )}
             </div>
-          </>
-        ) : null}
-
-        <div aria-live="polite" style={{ marginTop: 16 }}>
-          {message && (
-            <p
-              className="tc-body"
-              style={{ fontSize: 14, margin: 0, color: message.kind === 'error' ? '#C0392B' : '#2E7D32' }}
-            >
-              {message.text}
-            </p>
-          )}
-        </div>
-      </section>
+          </section>
+        </>
+      )}
     </article>
   )
 }

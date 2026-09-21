@@ -1,0 +1,11 @@
+# Only the functions directory is declared here. The build command and the
+# publish directory stay where they have been since v1.0 — in the Netlify site
+# settings — and nothing in this file overrides them.
+#
+# SPA routing stays in public/_redirects. Netlify matches /.netlify/functions/*
+# before any redirect rule, so the catch-all there does not swallow the admin
+# function.
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

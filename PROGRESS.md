@@ -2,14 +2,16 @@
 
 > Claude Code: read this file at the start of every session, before touching anything. Update it at every save point. Replace content, do not append. History lives in git.
 
-**Session:** 3 — the v2.1 authorization upgrade
-**Last updated:** 21 September 2026
-**Live URL:** none yet [Rule: fill in after the first successful deploy]
+**Session:** 4 — v2.1 deploy and closeout
+**Last updated:** 28 September 2026
+**Live URL:** deployed — builder to confirm the URL for this line [Rule: fill in after the first successful deploy]
 
 ## Current state
 
-v2.1 is built. The access model moved from A2 to A3 this session: three functional roles, an Admin
-flag, a User Management panel, and a Change Password screen. Nothing is deployed yet.
+v2.1 is built, deployed, and closed out. The access model moved from A2 to A3 in session 3: three
+functional roles, an Admin flag, a User Management panel, and a Change Password screen. All
+Remaining work from session 3, carried v1.0 items included, is now closed per the builder's
+confirmation this session — see Last session and Refusal test record below.
 
 **Database — "The corporate live build (New)", complete and verified.** Four named migrations
 applied and saved as files in `supabase/migrations/`:
@@ -46,15 +48,24 @@ save, deactivate/reactivate, reset password, one-time password panel with a copy
 Admin-only nav link, the role-conditional action area on Supplier Detail, and route guards on
 `/users` and `/review/:id`. `npm run build` succeeds.
 
-**Refusal test half A is done and recorded below — 74 assertions, all passing: 36 against the live
-database and 38 against the screens.** Half B, the four named people on the real screens, is still
-outstanding and gates the deploy.
+**Refusal test half A (session 3) and half B (session 4) are both done — see Refusal test record
+below.** All 74 half-A assertions plus the half-B screen walk against the four named accounts pass.
+Deploy gate is clear.
 
 ## Last session
 
-Session 3. Built the whole v2.1 upgrade: four migrations applied to the live project and saved as
-files, the admin Netlify Function, the Change Password screen, the User Management panel, the
-role-conditional action area, and the two route guards. Ran refusal test half A — 74 assertions,
+Session 4. Builder closed out every item session 3 left in Remaining work and confirmed completion
+directly rather than through a Claude Code-run check. Claude Code independently verified only what
+the local repo can show: `origin/main` carries the merge commit for `claude/brave-feynman-1glm48`
+(session 3's feature branch), closing that item, and the builder's Netlify screenshots confirmed
+`SUPABASE_SERVICE_ROLE_KEY` and `SECRETS_SCAN_OMIT_KEYS` are set with the correct build settings.
+Everything else below — Supabase dashboard settings, the Tool A doc copy, refusal test half B, and
+the live pass — is recorded on the builder's word, not on a Claude Code-run test against the live
+site; see Known issues for the one item this adds.
+
+Session 3, prior: built the whole v2.1 upgrade — four migrations applied to the live project and
+saved as files, the admin Netlify Function, the Change Password screen, the User Management panel,
+the role-conditional action area, and the two route guards. Ran refusal test half A — 74 assertions,
 all passing — and updated `docs/supabase-setup.md` to match.
 
 One real bug was found and fixed by the screen harness rather than by reading: on a deep link or a
@@ -65,45 +76,39 @@ account the loaded profile belongs to, so it cannot be true for the wrong sessio
 
 ## Remaining work
 
-Carried from v1.0, still open:
+All items carried from v1.0 and all v2.1 items are closed as of session 4, per the builder's
+confirmation:
 
-- [ ] **Builder: rotate the three temporary account passwords.** Easiest route now is the new
-      panel's Reset password action, once deployed — see Open questions in spec Section 15.
-- [ ] **Builder: disable public signup** in Supabase → Authentication → Providers. Not yet confirmed.
-- [ ] Builder: confirm the Netlify publish directory is `dist` and the build command is
-      `npm run build`, and that `SECRETS_SCAN_OMIT_KEYS` is saved alongside both `VITE_` variables
-- [ ] Builder: upgrade the Supabase project to Pro (manual billing step)
-- [ ] Builder: copy the updated `docs/supabase-setup.md` back into Tool A's repo so the two tools do
-      not drift on schema truth
+- [x] Rotate the three temporary account passwords.
+- [x] Disable public signup in Supabase → Authentication → Providers.
+- [x] Netlify publish directory `dist`, build command `npm run build`, `SECRETS_SCAN_OMIT_KEYS` set
+      alongside both `VITE_` variables — verified by builder screenshot of the Netlify build
+      settings and environment variables list.
+- [x] Upgrade the Supabase project to Pro.
+- [x] Copy the updated `docs/supabase-setup.md` back into Tool A's repo.
+- [x] Merge `claude/brave-feynman-1glm48` into `main` — verified independently: `origin/main`
+      carries the merge commit (`e386ff5`).
+- [x] Add `SUPABASE_SERVICE_ROLE_KEY` as a Netlify environment variable — verified by builder
+      screenshot; scoped to Builds, Functions, Runtime, not `VITE_`-prefixed.
+- [x] Refusal test half B — the four named people, on the real deployed screens. Procurement: no
+      action area at any status, no User Management link, `/users` redirects. EHS: same absence of
+      User Management, action area renders correctly by status. ESG Lead (Admin): own row's role
+      dropdown, Admin-flag toggle, and Deactivate toggle disabled with the inline note; Reset
+      password still works on their own row; all controls enabled on other rows.
+- [x] Live test pass after deploy: all four accounts sign in and see the correct rights; invite,
+      deactivate/reactivate, and password reset each work end to end against the real admin Netlify
+      Function.
+- [x] Spec Section 13 items 28–31 and the deployed-bundle half of 33.
+- [x] Walked the five by-hand scenarios in `docs/test-data/TEST-DATA-README.md` on the deployed
+      site.
+- [x] Ran `docs/test-data/teardown-test-submissions.sql` — the register now holds only real
+      suppliers.
+- [x] Leaked-password protection turned on in Supabase → Authentication.
+
+Open, not gating:
+
 - [ ] Optional: replace the 19 non-flag question labels in `src/lib/questionnaireSchema.js` with
-      Tool A's exact strings — see Known issues
-
-New for v2.1, in order:
-
-- [ ] **Builder: merge `claude/brave-feynman-1glm48` into `main`.** This session was pinned to a
-      feature branch, so Netlify only sees v2.1 once main moves. Sessions 1 and 2's branches are
-      already merged.
-- [ ] **Builder: add `SUPABASE_SERVICE_ROLE_KEY` as a Netlify environment variable, not
-      `VITE_`-prefixed.** The key exists on the project but is not yet in this tool's environment.
-      **Until it is, the User Management panel's three actions return "This function is not
-      configured" and nothing else in the tool is affected.**
-- [ ] **Refusal test half B — the four named people, on the screens.** Do not consider this phase
-      done until it passes. Procurement confirms no action area renders on Supplier Detail at any
-      status and that User Management is absent from the header; EHS confirms the same absence;
-      the ESG Lead confirms their own row's role dropdown and Admin-flag and Deactivate toggles are
-      disabled and that Reset password still works on it.
-- [ ] Live test pass after deploy: all four accounts sign in and see the correct rights; an invite,
-      a deactivate/reactivate, and a password reset each work end to end. This closes the two seams
-      no local session can reach — the browser-to-Supabase network call under a genuine JWT, and the
-      admin Netlify Function, which cannot run without Netlify and the service role key.
-- [ ] Spec Section 13 items that can only be closed live: 28 (a direct call to the admin endpoint as
-      a non-admin returns 403), 29 (invite), 30 (deactivate/reactivate), 31 (reset password), and the
-      deployed-bundle half of 33.
-- [ ] Walk the five by-hand scenarios in `docs/test-data/TEST-DATA-README.md` on the deployed site.
-- [ ] **Run `docs/test-data/teardown-test-submissions.sql` before the three colleagues use the tool
-      for real**, so the register they see holds only real suppliers.
-- [ ] Builder, optional but cheap: turn on leaked-password protection in Supabase → Authentication.
-      The security advisor flags it as off, and the tool now issues starter passwords.
+      Tool A's exact strings — see Known issues.
 
 ## Refusal test record
 
@@ -181,6 +186,19 @@ network seam is unreachable here. The harness lived in a scratch directory and w
   saves and calls `updateUser` exactly once.
 - No Acid Lime on either new screen, as the brand rule requires.
 
+**Half B — reported by the builder, 28 September 2026, against the four named accounts on the real
+deployed screens.** Not run or observed by Claude Code — this session has no way to reach the live
+site or sign in as any account. Recorded on the builder's confirmation:
+
+- Procurement: no action area at any status on Supplier Detail; no User Management link.
+- EHS: same absence of User Management; action area renders correctly by status.
+- ESG Lead (Admin): own row's role dropdown, Admin-flag toggle, and Deactivate toggle disabled with
+  the inline note; Reset password still works on their own row; all controls enabled on other rows.
+
+Live pass (invite, deactivate/reactivate, reset password against the real admin Netlify Function;
+all four accounts signing in with correct rights) is likewise recorded on the builder's confirmation
+only — see Known issues.
+
 [Rule: kept, never cleared; the handover package copies it. Any change to a rule re-runs both halves
 before the push.]
 
@@ -230,16 +248,18 @@ New this session:
   Closing that window entirely would mean an `is_active` check inside the review functions, which
   `docs/access-matrix.md` does not name as a mechanism, or a shorter JWT lifetime in the dashboard.
   Recorded rather than built.
-- **The 32 seeded test rows are live in the shared table right now.** They are fabricated, but they
-  are visible to Tool B users, count in Tool A's duplicate matching, and export to CSV like any other
-  row. `docs/test-data/teardown-test-submissions.sql` removes them and nothing else. The four
-  `ZZ Blocked Test` rows from session 2 are already gone.
-- **The three account passwords are temporary and were set by Claude Code, not by the builder.**
-  Rotate all three before the colleagues use the tool. The new panel's Reset password action is the
-  easiest route once the tool is deployed and the service role key is in the environment.
-- **Public signup has not been confirmed as disabled.** The MCP exposes no auth-settings tool.
-  Nothing in this tool offers a signup path, but the Supabase endpoint is open until that setting is
-  off.
+- **Session 4's closeout (deploy, both refusal-test halves, the live pass, all Supabase-dashboard
+  and Netlify settings) is recorded on the builder's confirmation, not on a check Claude Code ran
+  itself.** This environment cannot reach the live site or the Supabase dashboard directly; of the
+  items closed this session, only two were independently verified — the `main` merge commit
+  (git) and the two Netlify settings shown in the builder's screenshots
+  (`SUPABASE_SERVICE_ROLE_KEY`, `SECRETS_SCAN_OMIT_KEYS`, build command, publish directory).
+  Everything else in Remaining work's closed list — password rotation, public signup disabled, the
+  Supabase Pro upgrade, the `docs/supabase-setup.md` copy into Tool A's repo, refusal test half B,
+  and the live pass — rests on the builder's word. Not a defect, just the honest provenance of this
+  save point.
+- **The 32 seeded test rows were removed via `docs/test-data/teardown-test-submissions.sql` this
+  session, per the builder.** Not independently verified — see the note above.
 - **19 of the 26 question labels are derived, not verbatim.** Tool A's `questionnaireSchema.js` is
   not in this repo, so only the seven flag-bearing questions carry the exact wording from spec
   Section 9. They are display labels only — nothing is computed from them.
@@ -291,4 +311,5 @@ New this session:
 
 ## Notes for next session
 
-None.
+Fill in the Live URL line at the top of this file — it's still a placeholder pending the builder
+confirming the deployed address.
